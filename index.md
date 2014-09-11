@@ -13,12 +13,12 @@ Complete usage and documentation available at: [Jekyll Bootstrap](http://jekyllb
 
 In `_config.yml` remember to specify your own data:
     
-    title : My Blog =)
+    title : My Blog :-)
     
-    author :
+    author : zery
       name : Name Lastname
-      email : blah@email.test
-      github : username
+      email : zerix.os@email.test
+      github : zerix.github.com
       twitter : username
 
 The theme should reference these variables whenever needed.
