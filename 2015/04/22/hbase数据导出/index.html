@@ -125,19 +125,12 @@
       
 
       
-        <pre><code>在hbase shell中，<span class="built_in">scan</span>功能相对强大，rowkey设计的好，可以拿到自己想要的数据。  
-</code></pre><p>但是其不支持直接重定向到文件中。而使用诸于hbase的mr export工具不能做到scan的强<br>大，由于客户要求，干脆自己动手写了一个。</p>
-<pre><code>主要原理是：  
-<span class="keyword">*</span><span class="keyword">*</span>编写一个spark离线计算任务，使用spark读取hbase数据功能，模拟hbase shell
-</code></pre><p>scan的相关命令。支持两种任务类型：<br>    1.直接扫描表数据，存储结果<br>    2.支持扫描结果按表中任意字段归并，并以之为文件名，存储结果<br>    数据导出的格式为每个字段scan的顺序，以逗号为分隔符，所以可以使用excel打开**</p>
-<pre><code>具体实现已经在[<span class="link_label">github</span>](<span class="link_url">https://github.com/zerix/export_hbase_table</span>)开源,  
-</code></pre><p>对某些同学用spark读取hbase或归类信息写文件或spark常见配置有参考意义。  </p>
-<pre><code>这里主要对多文件存储方式做一下讲解，在spark/hadoop中，最后的文件存储由于  
-</code></pre><p>reduce的数量不止一个，或者spark里面的partitions数量比较多，默认存储的文件会<br>按分成相应的part，其数量和reducer及partitions的数量一致。而使用MultipleText<br>OutputFormat会默认生成1个文件。（使用FSDataOutputStream也可以生成一份文件）<br>我们探探其实现背后的原理。</p>
-<pre><code>MultipleTextOutputFormat调用TextOutputFormat类，TextOutputFormat调用  
-</code></pre><p>TextOutputFormat.getRecordWriter覆盖基类的RecordWriter函数,其基类为MultipleOutputFormat。<br>在MultipleOutputFormat中，使用TreeMap缓存输出到不同文件的RecordWriter句柄。<br>在TextoutputFormat.getRecordWriter中，返回LineRecordWriter函数，LineRecordWriter<br>调用DataOutputStream作为其输出，使用DataOutputStream.write函数写入到hdfs文件系统中。 </p>
-<pre><code>而对于使用者来说，想要输出文件只有一个，只需要继承MultipleTextOutputFormat并覆盖  
-</code></pre><p>函数名函数即可。</p>
+        <p>  在hbase shell中，scan功能相对强大，rowkey设计的好，可以拿到自己想要的数据。<br>但是其不支持直接重定向到文件中。而使用诸于hbase的mr export工具不能做到scan的强<br>大，由于客户要求，干脆自己动手写了一个。</p>
+<p>  主要原理是：<br>  <strong>编写一个spark离线计算任务，使用spark读取hbase数据功能，模拟hbase shell scan的相关命令。支持两种任务类型：1.直接扫描表数据，存储结果.    2.支持扫描结果按表中任意字段归并，并以之为文件名，存储结果.数据导出的格式为每个字段scan的顺序，以逗号为分隔符，所以可以使用excel打开</strong></p>
+<p>  具体实现已经在<a href="https://github.com/zerix/export_hbase_table" target="_blank" rel="external">github</a>开源,<br>对某些同学用spark读取hbase或归类信息写文件或spark常见配置有参考意义。  </p>
+<p>  这里主要对多文件存储方式做一下讲解，在spark/hadoop中，最后的文件存储由于<br>reduce的数量不止一个，或者spark里面的partitions数量比较多，默认存储的文件会<br>按分成相应的part，其数量和reducer及partitions的数量一致。而使用MultipleText<br>OutputFormat会默认生成1个文件。（使用FSDataOutputStream也可以生成一份文件）<br>我们探探其实现背后的原理。</p>
+<p>  MultipleTextOutputFormat调用TextOutputFormat类，TextOutputFormat调用<br>TextOutputFormat.getRecordWriter覆盖基类的RecordWriter函数,其基类为MultipleOutputFormat。<br>在MultipleOutputFormat中，使用TreeMap缓存输出到不同文件的RecordWriter句柄。<br>在TextoutputFormat.getRecordWriter中，返回LineRecordWriter函数，LineRecordWriter<br>调用DataOutputStream作为其输出，使用DataOutputStream.write函数写入到hdfs文件系统中。 </p>
+<p>  而对于使用者来说，想要输出文件只有一个，只需要继承MultipleTextOutputFormat并覆盖<br>函数名函数即可。</p>
 
       
     </div>
