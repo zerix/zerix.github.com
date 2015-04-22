@@ -29,7 +29,7 @@
 
 
 
-  <title> Hello World // zery's blog </title>
+  <title> hbase数据导出 // zery's blog </title>
 </head>
 
 <body>
@@ -100,7 +100,7 @@
           
           
             
-              Hello World
+              hbase数据导出
             
           
         </h1>
@@ -108,7 +108,7 @@
 
       <div class="post-meta">
         <span class="post-time">
-          發表於 2015-04-16
+          發表於 2015-04-22
         </span>
 
         
@@ -125,15 +125,19 @@
       
 
       
-        <p>Welcome to <a href="http://hexo.io/" target="_blank" rel="external">Hexo</a>! This is your very first post. Check <a href="http://hexo.io/docs/" target="_blank" rel="external">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="http://hexo.io/docs/troubleshooting.html" target="_blank" rel="external">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="external">GitHub</a>.</p>
-<h2 id="Quick_Start">Quick Start</h2><h3 id="Create_a_new_post">Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-<p>More info: <a href="http://hexo.io/docs/writing.html" target="_blank" rel="external">Writing</a></p>
-<h3 id="Run_server">Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="http://hexo.io/docs/server.html" target="_blank" rel="external">Server</a></p>
-<h3 id="Generate_static_files">Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="http://hexo.io/docs/generating.html" target="_blank" rel="external">Generating</a></p>
-<h3 id="Deploy_to_remote_sites">Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="http://hexo.io/docs/deployment.html" target="_blank" rel="external">Deployment</a></p>
+        <pre><code>在hbase shell中，<span class="built_in">scan</span>功能相对强大，rowkey设计的好，可以拿到自己想要的数据。  
+</code></pre><p>但是其不支持直接重定向到文件中。而使用诸于hbase的mr export工具不能做到scan的强<br>大，由于客户要求，干脆自己动手写了一个。</p>
+<pre><code>主要原理是：  
+<span class="keyword">*</span><span class="keyword">*</span>编写一个spark离线计算任务，使用spark读取hbase数据功能，模拟hbase shell   
+</code></pre><p>scan的相关命令。支持两种任务类型：<br>    1.直接扫描表数据，存储结果<br>    2.支持扫描结果按表中任意字段归并，并以之为文件名，存储结果<br>    数据导出的格式为每个字段scan的顺序，以逗号为分隔符，所以可以使用excel打开**</p>
+<pre><code>具体实现已经在[<span class="link_label">github</span>](<span class="link_url">https://github.com/zerix/export_hbase_table</span>)开源,  
+</code></pre><p>对某些同学用spark读取hbase或归类信息写文件或spark常见配置有参考意义。  </p>
+<pre><code>这里主要对多文件存储方式做一下讲解，在spark/hadoop中，最后的文件存储由于  
+</code></pre><p>reduce的数量不止一个，或者spark里面的partitions数量比较多，默认存储的文件会<br>按分成相应的part，其数量和reducer及partitions的数量一致。而使用MultipleText<br>OutputFormat会默认生成1个文件。（使用FSDataOutputStream也可以生成一份文件）<br>我们探探其实现背后的原理。</p>
+<pre><code>MultipleTextOutputFormat调用TextOutputFormat类，TextOutputFormat调用  
+</code></pre><p>TextOutputFormat.getRecordWriter覆盖基类的RecordWriter函数,其基类为MultipleOutputFormat。<br>在MultipleOutputFormat中，使用TreeMap缓存输出到不同文件的RecordWriter句柄。<br>在TextoutputFormat.getRecordWriter中，返回LineRecordWriter函数，LineRecordWriter<br>调用DataOutputStream作为其输出，使用DataOutputStream.write函数写入到hdfs文件系统中。 </p>
+<pre><code>而对于使用者来说，想要输出文件只有一个，只需要继承MultipleTextOutputFormat并覆盖  
+</code></pre><p>函数名函数即可。</p>
 
       
     </div>
@@ -145,11 +149,11 @@
         <div class="post-nav">
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2015/04/16/第一篇/">第一篇</a>
-            
           </div>
 
           <div class="post-nav-next post-nav-item">
+            
+              <a href="/2015/04/16/第一篇/">第一篇</a>
             
           </div>
         </div>
@@ -244,7 +248,7 @@
           <div class="post-toc">
             
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Quick_Start"><span class="nav-number">1.</span> <span class="nav-text">Quick Start</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Create_a_new_post"><span class="nav-number">1.1.</span> <span class="nav-text">Create a new post</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Run_server"><span class="nav-number">1.2.</span> <span class="nav-text">Run server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Generate_static_files"><span class="nav-number">1.3.</span> <span class="nav-text">Generate static files</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploy_to_remote_sites"><span class="nav-number">1.4.</span> <span class="nav-text">Deploy to remote sites</span></a></li></ol></li></ol></div>
+              <p class="post-toc-empty">此文章未包含目錄</p>
             
           </div>
           <div class="post-toc-indicator-bottom post-toc-indicator"></div>
