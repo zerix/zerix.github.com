@@ -146,7 +146,8 @@
 <span class="keyword">val</span> receive_stream = (<span class="number">1</span> <span class="keyword">to</span> num_node).map { 
     i =&gt; {
         <span class="keyword">val</span> topic = <span class="type">Map</span>(source_kafka_topic -&gt; <span class="number">1</span>)
-        <span class="keyword">val</span> kafka_stream = <span class="type">KafkaUtils</span>.createStream[<span class="type">String</span>, <span class="type">String</span>, <span class="type">StringDecoder</span>, <span class="type">StringDecoder</span>] (ssc, kafka_config, topic, <span class="type">StorageLevel</span>.<span class="type">MEMORY_ONLY_SER</span>).map(_._2)
+        <span class="keyword">val</span> kafka_stream = <span class="type">KafkaUtils</span>.createStream[<span class="type">String</span>, <span class="type">String</span>, <span class="type">StringDecoder</span>,   
+            <span class="type">StringDecoder</span>] (ssc, kafka_config, topic, <span class="type">StorageLevel</span>.<span class="type">MEMORY_ONLY_SER</span>).map(_._2)
         kafka_stream
     }
 }
