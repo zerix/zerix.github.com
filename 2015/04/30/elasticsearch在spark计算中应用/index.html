@@ -29,7 +29,7 @@
 
 
 
-  <title> hbase数据导出 // zery's blog </title>
+  <title> elasticsearch在spark计算中应用 // zery's blog </title>
 </head>
 
 <body>
@@ -100,7 +100,7 @@
           
           
             
-              hbase数据导出
+              elasticsearch在spark计算中应用
             
           
         </h1>
@@ -108,7 +108,7 @@
 
       <div class="post-meta">
         <span class="post-time">
-          發表於 2015-04-22
+          發表於 2015-04-30
         </span>
 
         
@@ -125,12 +125,44 @@
       
 
       
-        <p>在hbase shell中，scan功能相对强大，rowkey设计的好，可以拿到自己想要的数据。但是其不支持直接重定向到文件中。而使用诸于hbase的mr export工具不能做到scan的强大，由于客户要求，干脆自己动手写了一个。</p>
-<p>主要原理是：<br><strong>编写一个spark离线计算任务，使用spark读取hbase数据功能，模拟hbase shell scan的相关命令。支持两种任务类型：1.直接扫描表数据，存储结果.    2.支持扫描结果按表中任意字段归并，并以之为文件名，存储结果.数据导出的格式为每个字段scan的顺序，以逗号为分隔符，所以可以使用excel打开</strong></p>
-<p>具体实现已经在<a href="https://github.com/zerix/export_hbase_table" target="_blank" rel="external">github</a>开源,对某些同学用spark读取hbase或归类信息写文件或spark常见配置有参考意义。</p>
-<p>这里主要对多文件存储方式做一下讲解，在spark/hadoop中，最后的文件存储由于reduce的数量不止一个，或者spark里面的partitions数量比较多，默认存储的文件会按分成相应的part，其数量和reducer及partitions的数量一致。而使用MultipleTextOutputFormat会默认生成1个文件（使用FSDataOutputStream也可以生成一份文件）。我们探探其实现背后的原理。</p>
-<p>MultipleTextOutputFormat调用TextOutputFormat类，TextOutputFormat调用TextOutputFormat.getRecordWriter覆盖基类的RecordWriter函数,其基类为MultipleOutputFormat。在MultipleOutputFormat中，使用TreeMap缓存输出到不同文件的RecordWriter句柄。在TextoutputFormat.getRecordWriter中，返回LineRecordWriter函数，LineRecordWriter调用DataOutputStream作为其输出，使用DataOutputStream.write函数写入到hdfs文件系统中。 </p>
-<p>而对于使用者来说，想要输出文件只有一个，只需要继承MultipleTextOutputFormat并覆盖函数名函数即可。</p>
+        <p>在大数据量的计算任务中，结果展示是一个很重要的环节，普通的hbase存储结果，当结果数据量较大时，scan结合filter的方式的查询效率就不能忍受了。我们选用了elasticsearch的搜索引擎解决方案来解决问题，其和solr类似，我们使用其本地磁盘做数据存储的模式，插入时创建索引完成数据结果的实时查询。  </p>
+<h1 id="整体架构">整体架构</h1><p>在实际产品中，我们使用spark streaming消费kafka的数据，做1分钟数据计算。计算完的数据结果，会存储两份,  </p>
+<blockquote>
+<p>其中一份丢hbase，以用作离线计算5分钟和1个小时的计算任务数据源。<br>另一份结果直接插入ES(elasticsearch)中，提供给1分钟webUI查询结果。<br>因为我们的数据结构满足结合律，所以1分钟的数据结果可以用来复用，减少5分钟和1个小时任务的计算量。由于我们的日志存在超时情况，所以选用hbase是为了给后续的月份报表，年报表时增加超时日志计算来用。但某些需求需要5分钟或1个小时的计算任务需要保证数据准确性，我们在hbase中新增一个表用来存储当天的超时日志，每日添加一个超时计算任务来完成超时日志的计算和结果追加功能。</p>
+</blockquote>
+<h1 id="Spark中使用">Spark中使用</h1><p>elasticsearch官方提供spark的API，我们主要使用其写ES并自动创建索引功能。<br>        val conf = new SparkConf()<br>                .set(“es.index.auto.create”, “true”)<br>                .set(“es.node”, es_node_ip)</p>
+<pre><code><span class="keyword">val</span> ssc = <span class="keyword">new</span> <span class="type">StreamingContext</span>(conf, <span class="type">Seconds</span>(<span class="number">30</span>))
+
+<span class="keyword">val</span> kafka_config = <span class="type">Map</span>(
+    <span class="string">"zookeeper.connect"</span> -&gt; zk_quorum,
+    <span class="string">"group.id"</span> -&gt; group_id
+)
+
+<span class="keyword">val</span> receive_stream = (<span class="number">1</span> <span class="keyword">to</span> num_node).map { 
+    i =&gt; {
+        <span class="keyword">val</span> topic = <span class="type">Map</span>(source_kafka_topic -&gt; <span class="number">1</span>)
+        <span class="keyword">val</span> kafka_stream = <span class="type">KafkaUtils</span>.createStream[<span class="type">String</span>, <span class="type">String</span>, <span class="type">StringDecoder</span>, <span class="type">StringDecoder</span>] (ssc, kafka_config, topic, <span class="type">StorageLevel</span>.<span class="type">MEMORY_ONLY_SER</span>).map(_._2)
+        kafka_stream
+    }
+}
+
+
+<span class="keyword">val</span> lines = ssc.union(receive_stream)
+
+<span class="keyword">val</span> store_es_task = lines.map(rdd =&gt; {
+    <span class="keyword">val</span> line_fields = rdd.split(<span class="string">"\t"</span>)
+    <span class="keyword">val</span> log_hash = <span class="type">Map</span>(<span class="string">"log_type"</span> -&gt; line_fields(<span class="number">0</span>).toInt,
+                        <span class="string">"timestamp"</span> -&gt; line_fields(<span class="number">1</span>).toLong,
+                        <span class="string">"request_num"</span> -&gt; line_fields(<span class="number">2</span>).toInt,
+                        <span class="string">"domain"</span> -&gt; line_fields(<span class="number">3</span>),
+                        <span class="string">"cost_time"</span> -&gt; line_fields(<span class="number">4</span>).toInt)
+    log_hash
+}).foreachRDD(rdd =&gt; {
+    rdd.saveToEs(<span class="string">"http_request_log/"</span> + (<span class="type">System</span>.currentTimeMillis<span class="literal">()</span> / <span class="number">1000</span> / <span class="number">60</span> / <span class="number">60</span> / <span class="number">24</span>))
+})
+</code></pre><p>此段代码完成了从kafka中读取数据，并解析，将结果存入es中的全过程。我们要注意spark的ES接口提供自动索引功能，上例中，ES中会自动创建log_type, timestamp, request_num, domain, cost_time这几个索引，其类型为第一条数据插入时的数据格式类型。如果你对后续的插入类型有修改，需要将之前创建的索引数据删除掉。saveToEs的参数为ES的index和type字段，index类似普通数据库的概念，type是表或者分区的概念，不知道id的话，其会自动生成id，和rowkey概念一致。index,type,id三个参数都可以自动生成，为了优化搜索，建议根据业务进行相应数据分区，因为查询时加载的数据源即指定index和type。  </p>
+<p>插入到ES后，我们可以使用crul -XGET/XDELETE/XPUT等命令来完成对ES的命令行查询工作，也可以使用ES提供的java相关API来完成查询。</p>
+<h1 id="ES原理篇">ES原理篇</h1><p>由于刚开始接触，仅仅对应用比较熟悉，相关原理可以查阅<a href="http://shgy.gitbooks.io/mastering-elasticsearch/content/chapter-1/README.html" target="_blank" rel="external">http://shgy.gitbooks.io/mastering-elasticsearch/content/chapter-1/README.html</a></p>
 
       
     </div>
@@ -142,13 +174,11 @@
         <div class="post-nav">
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2015/04/30/elasticsearch在spark计算中应用/">elasticsearch在spark计算中应用</a>
-            
           </div>
 
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2015/04/16/第一篇/">第一篇</a>
+              <a href="/2015/04/22/hbase数据导出/">hbase数据导出</a>
             
           </div>
         </div>
@@ -243,7 +273,7 @@
           <div class="post-toc">
             
             
-              <p class="post-toc-empty">此文章未包含目錄</p>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#整体架构"><span class="nav-number">1.</span> <span class="nav-text">整体架构</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Spark中使用"><span class="nav-number">2.</span> <span class="nav-text">Spark中使用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ES原理篇"><span class="nav-number">3.</span> <span class="nav-text">ES原理篇</span></a></li></ol></div>
             
           </div>
           <div class="post-toc-indicator-bottom post-toc-indicator"></div>
