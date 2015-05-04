@@ -136,8 +136,12 @@
 <p>其中一份丢hbase，以用作离线计算5分钟和1个小时的计算任务数据源。<br>另一份结果直接插入ES(elasticsearch)中，提供给1分钟webUI查询结果。  </p>
 </blockquote>
 <p>因为我们的数据结构满足结合律，所以1分钟的数据结果可以用来复用，减少5分钟和1个小时任务的计算量。由于我们的日志存在超时情况，所以选用hbase是为了给后续的月份报表，年报表时增加超时日志计算来用。但某些需求需要5分钟或1个小时的计算任务需要保证数据准确性，我们在hbase中新增一个表用来存储当天的超时日志，每日添加一个超时计算任务来完成超时日志的计算和结果追加功能。</p>
-<h1 id="Spark中使用">Spark中使用</h1><p>elasticsearch官方提供spark的API，我们主要使用其写ES并自动创建索引功能。<br>        val conf = new SparkConf()<br>        .set(“es.index.auto.create”, “true”)<br>        .set(“es.node”, es_node_ip)</p>
-<pre><code><span class="keyword">val</span> ssc = <span class="keyword">new</span> <span class="type">StreamingContext</span>(conf, <span class="type">Seconds</span>(<span class="number">30</span>))
+<h1 id="Spark中使用">Spark中使用</h1><p>elasticsearch官方提供spark的API，我们主要使用其写ES并自动创建索引功能。  </p>
+<pre><code><span class="keyword">val</span> conf = <span class="keyword">new</span> <span class="type">SparkConf</span><span class="literal">()</span>
+.set(<span class="string">"es.index.auto.create"</span>, <span class="string">"true"</span>)
+.set(<span class="string">"es.node"</span>, es_node_ip)
+
+<span class="keyword">val</span> ssc = <span class="keyword">new</span> <span class="type">StreamingContext</span>(conf, <span class="type">Seconds</span>(<span class="number">30</span>))
 
 <span class="keyword">val</span> kafka_config = <span class="type">Map</span>(
     <span class="string">"zookeeper.connect"</span> -&gt; zk_quorum,
