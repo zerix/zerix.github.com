@@ -102,6 +102,100 @@
           
           
             
+              <a class="post-title-link" href="/2015/05/06/elasticsearch模板/">
+                elasticsearch模板
+              </a>
+            
+          
+        </h1>
+      
+
+      <div class="post-meta">
+        <span class="post-time">
+          發表於 2015-05-06
+        </span>
+
+        
+
+        
+          
+        
+      </div>
+    </div>
+
+    <div class="post-body">
+
+      
+      
+
+      
+        
+          <p>在日志分析系列产品中，我们将ES主要用来做结果存储查询使用，而日志统计结果都是一些固定的字段内容，不需要使用到其分词功能。ES的默认分词会导致使用term接口查询domain时，无法匹配整个url的情况。我们使用  </p>
+<blockquote>
+<p>curl -XGET <a href="http://esserver:9200/indexname/\_analyze?text=domain" target="_blank" rel="external">http://esserver:9200/indexname/\_analyze?text=domain</a>  </p>
+</blockquote>
+<p>可以查询到domain被分词解析成了几个字段。  </p>
+<p>在ES的自动创建索引过程中，会去匹配模板，来生成索引。如果我们设置好默认模板，就可以控制自动创建索引的过程。我们主要目的是将String类型增加not_analyzed属性，如此ES在创建索引过程中就不会对String类型进行分词。<br>        {<br>            “template” : “*”,<br>            “settings” : {</p>
+<pre><code>        <span class="string">"index.number_of_shards"</span> : <span class="number">5</span>,
+        <span class="string">"number_of_replicas"</span> : <span class="number">1</span>,
+        <span class="string">"index"</span> : {
+            <span class="string">"query"</span> : { <span class="string">"default_field"</span> : <span class="string">"message"</span>},
+            <span class="string">"store"</span> : { <span class="string">"compress"</span> : { <span class="string">"stored"</span> : <span class="literal">true</span>, <span class="string">"tv"</span>: <span class="literal">true</span> } }
+        }
+    },
+
+    <span class="string">"mappings"</span>: {
+        <span class="string">"_default_"</span>: { 
+            <span class="string">"_all"</span>: { <span class="string">"enabled"</span>: <span class="literal">true</span> },
+            <span class="string">"_source"</span>: { <span class="string">"compress"</span>: <span class="literal">true</span> },
+            <span class="string">"dynamic_templates"</span>: [
+            {
+                <span class="string">"string_template"</span> : { 
+                    <span class="string">"match"</span> : <span class="string">"*"</span>,
+                    <span class="string">"mapping"</span>: { <span class="string">"type"</span>: <span class="string">"string"</span>, <span class="string">"index"</span>: <span class="string">"not_analyzed"</span> },
+                    <span class="string">"match_mapping_type"</span> : <span class="string">"string"</span>
+                } 
+            }
+            ]
+        }
+    }
+}  
+</code></pre><p>其中tempate表示匹配的索引的type，*表示所有的索引，支持正则表达式。  </p>
+<p>我们使用  </p>
+<blockquote>
+<p>curl -XPUT <a href="http://esserver:9200/\_template/new\_template\_name" target="_blank" rel="external">http://esserver:9200/\_template/new\_template\_name</a> ‘template content’  </p>
+</blockquote>
+<p>就可以新建一个索引模板，新建的索引都会默认读取该模板配置。  </p>
+
+        
+      
+    </div>
+
+    <div class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </div>
+  </div>
+
+
+    
+      
+
+  <div class="post post-type-normal ">
+    <div class="post-header">
+
+      
+      
+        <h1 class="post-title">
+          
+          
+            
               <a class="post-title-link" href="/2015/04/30/elasticsearch在spark计算中应用/">
                 elasticsearch在spark计算中应用
               </a>
@@ -425,7 +519,7 @@
         <div class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">4</span>
+              <span class="site-state-item-count">5</span>
               <span class="site-state-item-name">文章</span>
             </a>
           </div>
