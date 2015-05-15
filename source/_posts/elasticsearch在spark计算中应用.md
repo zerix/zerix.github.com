@@ -6,15 +6,18 @@ tags:
 
 #整体架构#
 在实际产品中，我们使用spark streaming消费kafka的数据，做1分钟数据计算。计算完的数据结果，会存储两份,  
+
 > 其中一份丢hbase，以用作离线计算5分钟和1个小时的计算任务数据源。  
 > 另一份结果直接插入ES(elasticsearch)中，提供给1分钟webUI查询结果。  
+  
 因为我们的数据结构满足结合律，所以1分钟的数据结果可以用来复用，减少5分钟和1个小时任务的计算量。由于我们的日志存在超时情况，所以选用hbase是为了给后续的月份报表，年报表时增加超时日志计算来用。但某些需求需要5分钟或1个小时的计算任务需要保证数据准确性，我们在hbase中新增一个表用来存储当天的超时日志，每日添加一个超时计算任务来完成超时日志的计算和结果追加功能。
 
 #Spark中使用#
 elasticsearch官方提供spark的API，我们主要使用其写ES并自动创建索引功能。  
+
 		val conf = new SparkConf()
-				.set("es.index.auto.create", "true")
-				.set("es.node", es_node_ip)
+		.set("es.index.auto.create", "true")
+		.set("es.node", es_node_ip)
 
 		val ssc = new StreamingContext(conf, Seconds(30))
 
@@ -26,7 +29,8 @@ elasticsearch官方提供spark的API，我们主要使用其写ES并自动创建
 		val receive_stream = (1 to num_node).map { 
 			i => {
 				val topic = Map(source_kafka_topic -> 1)
-				val kafka_stream = KafkaUtils.createStream[String, String, StringDecoder, StringDecoder] (ssc, kafka_config, topic, StorageLevel.MEMORY_ONLY_SER).map(_._2)
+				val kafka_stream = KafkaUtils.createStream[String, String, StringDecoder,   
+					StringDecoder] (ssc, kafka_config, topic, StorageLevel.MEMORY_ONLY_SER).map(_._2)
 				kafka_stream
 			}
 		}
