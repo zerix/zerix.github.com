@@ -128,10 +128,15 @@
         <p>在大数据量的计算任务中，结果展示是一个很重要的环节，普通的hbase存储结果，当结果数据量较大时，scan结合filter的方式的查询效率就不能忍受了。我们选用了elasticsearch的搜索引擎解决方案来解决问题，其和solr类似，我们使用其本地磁盘做数据存储的模式，插入时创建索引完成数据结果的实时查询。  </p>
 <h1 id="整体架构">整体架构</h1><p>在实际产品中，我们使用spark streaming消费kafka的数据，做1分钟数据计算。计算完的数据结果，会存储两份,  </p>
 <blockquote>
-<p>其中一份丢hbase，以用作离线计算5分钟和1个小时的计算任务数据源。<br>另一份结果直接插入ES(elasticsearch)中，提供给1分钟webUI查询结果。<br>因为我们的数据结构满足结合律，所以1分钟的数据结果可以用来复用，减少5分钟和1个小时任务的计算量。由于我们的日志存在超时情况，所以选用hbase是为了给后续的月份报表，年报表时增加超时日志计算来用。但某些需求需要5分钟或1个小时的计算任务需要保证数据准确性，我们在hbase中新增一个表用来存储当天的超时日志，每日添加一个超时计算任务来完成超时日志的计算和结果追加功能。</p>
+<p>其中一份丢hbase，以用作离线计算5分钟和1个小时的计算任务数据源。<br>另一份结果直接插入ES(elasticsearch)中，提供给1分钟webUI查询结果。  </p>
 </blockquote>
-<h1 id="Spark中使用">Spark中使用</h1><p>elasticsearch官方提供spark的API，我们主要使用其写ES并自动创建索引功能。<br>        val conf = new SparkConf()<br>                .set(“es.index.auto.create”, “true”)<br>                .set(“es.node”, es_node_ip)</p>
-<pre><code><span class="keyword">val</span> ssc = <span class="keyword">new</span> <span class="type">StreamingContext</span>(conf, <span class="type">Seconds</span>(<span class="number">30</span>))
+<p>因为我们的数据结构满足结合律，所以1分钟的数据结果可以用来复用，减少5分钟和1个小时任务的计算量。由于我们的日志存在超时情况，所以选用hbase是为了给后续的月份报表，年报表时增加超时日志计算来用。但某些需求需要5分钟或1个小时的计算任务需要保证数据准确性，我们在hbase中新增一个表用来存储当天的超时日志，每日添加一个超时计算任务来完成超时日志的计算和结果追加功能。</p>
+<h1 id="Spark中使用">Spark中使用</h1><p>elasticsearch官方提供spark的API，我们主要使用其写ES并自动创建索引功能。  </p>
+<pre><code><span class="keyword">val</span> conf = <span class="keyword">new</span> <span class="type">SparkConf</span><span class="literal">()</span>
+.set(<span class="string">"es.index.auto.create"</span>, <span class="string">"true"</span>)
+.set(<span class="string">"es.node"</span>, es_node_ip)
+
+<span class="keyword">val</span> ssc = <span class="keyword">new</span> <span class="type">StreamingContext</span>(conf, <span class="type">Seconds</span>(<span class="number">30</span>))
 
 <span class="keyword">val</span> kafka_config = <span class="type">Map</span>(
     <span class="string">"zookeeper.connect"</span> -&gt; zk_quorum,
@@ -141,7 +146,8 @@
 <span class="keyword">val</span> receive_stream = (<span class="number">1</span> <span class="keyword">to</span> num_node).map { 
     i =&gt; {
         <span class="keyword">val</span> topic = <span class="type">Map</span>(source_kafka_topic -&gt; <span class="number">1</span>)
-        <span class="keyword">val</span> kafka_stream = <span class="type">KafkaUtils</span>.createStream[<span class="type">String</span>, <span class="type">String</span>, <span class="type">StringDecoder</span>, <span class="type">StringDecoder</span>] (ssc, kafka_config, topic, <span class="type">StorageLevel</span>.<span class="type">MEMORY_ONLY_SER</span>).map(_._2)
+        <span class="keyword">val</span> kafka_stream = <span class="type">KafkaUtils</span>.createStream[<span class="type">String</span>, <span class="type">String</span>, <span class="type">StringDecoder</span>,   
+            <span class="type">StringDecoder</span>] (ssc, kafka_config, topic, <span class="type">StorageLevel</span>.<span class="type">MEMORY_ONLY_SER</span>).map(_._2)
         kafka_stream
     }
 }
@@ -173,6 +179,8 @@
       
         <div class="post-nav">
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2015/05/06/elasticsearch模板/">elasticsearch模板</a>
             
           </div>
 
@@ -235,7 +243,7 @@
         <div class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">4</span>
+              <span class="site-state-item-count">5</span>
               <span class="site-state-item-name">文章</span>
             </a>
           </div>
