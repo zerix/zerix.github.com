@@ -125,11 +125,9 @@
       
 
       
-        <h1 id="题记">题记</h1><blockquote>
-<p>在我们的CDN日志分析项目中，初步部署的1300+台服务器每分钟上传60W+条日志，我们的spark streaming程序从kafka中读取数据，经过20多个计算任务计算后，将每分钟计算结果存入hbase和es中，hbase中存储的结果作为源数据提供给spark做离线计算，spark离线计算5分钟和1个小时的结果，将结果存入elasticsearch以供查询<br>整个过程架构如下： </p>
+        <h1 id="题记">题记</h1><p>在我们的CDN日志分析项目中，初步部署的1300+台服务器每分钟上传60W+条日志，我们的spark streaming程序从kafka中读取数据，经过20多个计算任务计算后，将每分钟计算结果存入hbase和es中，hbase中存储的结果作为源数据提供给spark做离线计算，spark离线计算5分钟和1个小时的结果，将结果存入elasticsearch以供查询<br>整个过程架构如下： </p>
 <blockquote>
 <p>实时： kafka  ———&gt;  spark streaming  —-(1min)—-&gt;  hbase/elasticsearch<br>离线： hbase  —-(1min)—-&gt;  spark  —-(5min/1hour)—-&gt; elasticsearch<br>此架构的选型，主要是因为在之前项目中使用hbase作为中间数据源，相对有经验及成熟代码。</p>
-</blockquote>
 </blockquote>
 <h1 id="问题">问题</h1><p>在实际生产环境中，20多个计算任务1分钟产生20+个计算结果，分别存储到hbase和elasticsearch中，相当于每分钟40+的计算结果。由于spark streaming程序对计算时间的要求，必须在1分钟的计算间隔内完成所有的计算任务，才能保证计算任务7/24稳定正常运行。此时，问题出现在结果数据的存储，一个计算任务产生10M的计算结果（亿条级别），存储到hbase/elastic search中需要50s+，20+个任务，整个流程需要5-8分钟才能完成。</p>
 <ol>
