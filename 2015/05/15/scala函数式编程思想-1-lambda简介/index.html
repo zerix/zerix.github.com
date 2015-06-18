@@ -29,7 +29,7 @@
 
 
 
-  <title> elasticsearch模板 // zery's blog </title>
+  <title> scala函数式编程思想._1.lambda简介 // zery's blog </title>
 </head>
 
 <body>
@@ -100,7 +100,7 @@
           
           
             
-              elasticsearch模板
+              scala函数式编程思想._1.lambda简介
             
           
         </h1>
@@ -108,7 +108,7 @@
 
       <div class="post-meta">
         <span class="post-time">
-          發表於 2015-05-06
+          發表於 2015-05-15
         </span>
 
         
@@ -125,45 +125,10 @@
       
 
       
-        <p>在日志分析系列产品中，我们将ES主要用来做结果存储查询使用，而日志统计结果都是一些固定的字段内容，不需要使用到其分词功能。ES的默认分词会导致使用term接口查询domain时，无法匹配整个url的情况。我们使用  </p>
-<blockquote>
-<p>curl -XGET <a href="http://esserver:9200/indexname/\_analyze?text=domain" target="_blank" rel="external">http://esserver:9200/indexname/\_analyze?text=domain</a>  </p>
+        <blockquote>
+<p>使用C语言7年之后，发现了scala新大陆。其实这些年一直对很多的语言感兴趣，最初的python,lisp,go，都在没有相关项目支撑，浅尝辄止后，一一放弃。而scala的学习却是在公司产品技术线的更新，大数据处理平台从hadoop转向spark这一需求而开始，所以也是一种际遇。  </p>
 </blockquote>
-<p>可以查询到domain被分词解析成了几个字段。  </p>
-<p>在ES的自动创建索引过程中，会去匹配模板，来生成索引。如果我们设置好默认模板，就可以控制自动创建索引的过程。我们主要目的是将String类型增加not_analyzed属性，如此ES在创建索引过程中就不会对String类型进行分词。  </p>
-<pre><code>{
-    "<span class="attribute">template</span>" : <span class="value"><span class="string">"*"</span></span>,
-    "<span class="attribute">settings</span>" : <span class="value">{
-        "<span class="attribute">index.number_of_shards</span>" : <span class="value"><span class="number">5</span></span>,
-        "<span class="attribute">number_of_replicas</span>" : <span class="value"><span class="number">1</span></span>,
-        "<span class="attribute">index</span>" : <span class="value">{
-            "<span class="attribute">query</span>" : <span class="value">{ "<span class="attribute">default_field</span>" : <span class="value"><span class="string">"message"</span></span>}</span>,
-            "<span class="attribute">store</span>" : <span class="value">{ "<span class="attribute">compress</span>" : <span class="value">{ "<span class="attribute">stored</span>" : <span class="value"><span class="literal">true</span></span>, "<span class="attribute">tv</span>": <span class="value"><span class="literal">true</span> </span>} </span>}
-        </span>}
-    </span>}</span>,
-
-    "<span class="attribute">mappings</span>": <span class="value">{
-        "<span class="attribute">_default_</span>": <span class="value">{ 
-            "<span class="attribute">_all</span>": <span class="value">{ "<span class="attribute">enabled</span>": <span class="value"><span class="literal">true</span> </span>}</span>,
-            "<span class="attribute">_source</span>": <span class="value">{ "<span class="attribute">compress</span>": <span class="value"><span class="literal">true</span> </span>}</span>,
-            "<span class="attribute">dynamic_templates</span>": <span class="value">[
-            {
-                "<span class="attribute">string_template</span>" : <span class="value">{ 
-                    "<span class="attribute">match</span>" : <span class="value"><span class="string">"*"</span></span>,
-                    "<span class="attribute">mapping</span>": <span class="value">{ "<span class="attribute">type</span>": <span class="value"><span class="string">"string"</span></span>, "<span class="attribute">index</span>": <span class="value"><span class="string">"not_analyzed"</span> </span>}</span>,
-                    "<span class="attribute">match_mapping_type</span>" : <span class="value"><span class="string">"string"</span>
-                </span>} 
-            </span>}
-            ]
-        </span>}
-    </span>}
-</span>}  
-</code></pre><p>其中tempate表示匹配的索引的type，*表示所有的索引，支持正则表达式。  </p>
-<p>我们使用  </p>
-<blockquote>
-<p>curl -XPUT <a href="http://esserver:9200/\_template/new\_template\_name" target="_blank" rel="external">http://esserver:9200/\_template/new\_template\_name</a> ‘template content’  </p>
-</blockquote>
-<p>就可以新建一个索引模板，新建的索引都会默认读取该模板配置。  </p>
+<h1 id="起源">起源</h1><p>在可计算性理论和计算复杂性理论中，决定性问题表示一个在某些形式系统回答是或否的问题。其定义为：决定性问题指的是在一个数量为无限大的输入集合中，可产出任何是或非解答的问题之集合。20世纪30年代，阿隆佐-邱奇和他的学生斯蒂芬-科尔-克莱尼运用lambda演算给出决定性问题一个否定的答案。这种演算可以用来清晰的定义什么是一个可计算函数。</p>
 
       
     </div>
@@ -175,13 +140,13 @@
         <div class="post-nav">
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2015/05/15/scala函数式编程思想-1-lambda简介/">scala函数式编程思想._1.lambda简介</a>
+              <a href="/2015/06/09/help/">help</a>
             
           </div>
 
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2015/04/30/elasticsearch在spark计算中应用/">elasticsearch在spark计算中应用</a>
+              <a href="/2015/05/06/elasticsearch模板/">elasticsearch模板</a>
             
           </div>
         </div>
@@ -276,7 +241,7 @@
           <div class="post-toc">
             
             
-              <p class="post-toc-empty">此文章未包含目錄</p>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#起源"><span class="nav-number">1.</span> <span class="nav-text">起源</span></a></li></ol></div>
             
           </div>
           <div class="post-toc-indicator-bottom post-toc-indicator"></div>

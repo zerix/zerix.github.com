@@ -102,6 +102,211 @@
           
           
             
+              <a class="post-title-link" href="/2015/06/18/spark-streaming-elasticsearch-hbase-在实战中的应用/">
+                spark streaming + elasticsearch/hbase 在实战中的应用
+              </a>
+            
+          
+        </h1>
+      
+
+      <div class="post-meta">
+        <span class="post-time">
+          發表於 2015-06-18
+        </span>
+
+        
+
+        
+          
+        
+      </div>
+    </div>
+
+    <div class="post-body">
+
+      
+      
+
+      
+        
+          <h1 id="题记">题记</h1><blockquote>
+<p>在我们的CDN日志分析项目中，初步部署的1300+台服务器每分钟上传60W+条日志，我们的spark streaming程序<br>从kafka中读取数据，经过20多个计算任务计算后，将每分钟计算结果存入hbase和es中，hbase中存储的结果作<br>为源数据提供给spark做离线计算，spark离线计算5分钟和1个小时的结果，将结果存入elasticsearch以供查询<br>整个过程架构如下： </p>
+<blockquote>
+<p>kafka  ———&gt;  spark streaming  ———&gt;  hbase  ———&gt;  spark  —-<br>                        |                                           |<br>                         ———&gt;  elasticsearch  &lt;———  ——— —-<br>此架构的选型，主要是因为在之前项目中使用hbase作为中间数据源，相对有经验及成熟代码。</p>
+</blockquote>
+</blockquote>
+<h1 id="问题">问题</h1><p>在实际生产环境中，20多个计算任务1分钟产生20+个计算结果，分别存储到hbase和elasticsearch中，相当于每分<br>钟40+的计算结果。由于spark streaming程序对计算时间的要求，必须在1分钟的计算间隔内完成所有的计算任务，<br>才能保证计算任务7/24稳定正常运行。此时，问题出现在结果数据的存储，一个计算任务产生10M的计算结果（亿<br>条级别），存储到hbase/elastic search中需要50s+，20+个任务，整个流程需要5-8分钟才能完成。</p>
+<ol>
+<li>方案一，观察spark streaming的webUI，发现其任务提交的串行性，虽然任务是并行执行，但是任务之间是串行<br>提交的。所以，将20+个计算任务分成6个独立任务，将1个任务的资源分成6份，同时提交6个子任务。 <blockquote>
+<p>此方案初步有效果，能保证程序在1分钟内执行完，但运行时间久了之后，发现写elasticsearch和写hbase在大数<br>据量时，写操作时间超过1分钟。所以hbase的写速率及elasticsearch的写速率必须优化。</p>
+</blockquote>
+</li>
+</ol>
+<h2 id="hbase_写优化">hbase 写优化</h2><p>由于我们的hbase使用其作为中间存储，离线计算任务需要scan时间戳来拿去5分钟内的源数据，所以我们在rowkey<br>中增加了时间戳，类似如 “function_a_result:timestamp:UUID” 格式，在hbase的web界面，可以发现其request<br>大多集中在集群的某一台机器上，也就是说，大多数的结果都存在了一个region server上。而hbase是通过rowkey<br>来选择regionserver的，为了写优化，最快的效率就是使用UUID作为其rowkey。由于UUID的随机性，能够保证所有<br>的行数据都均匀散列到集群的region server中。但此种做法就会导致离线计算无法根据时间戳拿到5分钟/1小时的<br>源数据。参考opentsdb的rowkey设计，我们折中，rowkey设计为：”random(0-5):timestamp:UUID”。<br>此种更改之后，写速率能够达到10M结果30-40s的写入时间。 </p>
+<h2 id="elasticsearch_优化">elasticsearch 优化</h2><p>elasticsearch由于索引及数据存储到本地磁盘，并使用分片的形式来做分布式的并行存储，所以其效率是比较高<br>的，但是我们的elasticsearch机器是部署在spark/mr的计算结点上，当有计算任务时，会导致ES的效率不稳定。<br>首先，我们将elastic search集群独立，迁移到5台32核96G内存12个磁盘的新服务器中，将12个磁盘全部分配给<br>elastic search，并将ES的默认5个分配增加到30个。配置数据服务器，搜索服务器，主节点服务器都单独分配。<br>现在测试发现，10M的计算结果(1亿条+)的写入速度在10s左右。</p>
+<p>在hbase和ES都分别做优化后，方案一虽然有性能大大幅提高，但是并不能满足7/24服务要求，所以此方案失败。 </p>
+<ol>
+<li>方案二，在优化ES后，发现其性能的优越,而hbase由于过于博大精深，在追求产品开发效率的时候，我们直接<br>使用ES作为中间数据存储，计算架构更改如下：<blockquote>
+<p> kafka  ———&gt;  spark streaming  ———&gt;  elasticsearch  ———&gt; spark —-</p>
+<pre><code><span class="comment">^</span>                       <span class="comment">|</span>
+<span class="comment">|</span>                       <span class="comment">|</span>
+ <span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span>  <span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span>  <span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span>
+</code></pre><p>直接读取ES内的一分钟计算结果，作为5分钟/1小时离线的数据源，由于ES的索引机制，所以读取时间远远快于<br>hbase。方案更改后，20+个计算任务分成2个子任务，每个子任务都能保证30s左右完成计算，保证了7/24服务。 </p>
+</blockquote>
+</li>
+</ol>
+<h1 id="后记">后记</h1><p>在spark streaming的生态系统中，tachyon也是一个王牌产品，将tachyon作为临时存储或者tachyon + spark sql<br>提供web界面实时结果查询，也是一个很好的方向。<br>在我们这个产品中，elasticsearch每分钟200MB结果实时写入，实时建索引，其性能表现值得注目。</p>
+
+        
+      
+    </div>
+
+    <div class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </div>
+  </div>
+
+
+    
+      
+
+  <div class="post post-type-normal ">
+    <div class="post-header">
+
+      
+      
+        <h1 class="post-title">
+          
+          
+            
+              <a class="post-title-link" href="/2015/06/09/help/">
+                help
+              </a>
+            
+          
+        </h1>
+      
+
+      <div class="post-meta">
+        <span class="post-time">
+          發表於 2015-06-09
+        </span>
+
+        
+
+        
+          
+        
+      </div>
+    </div>
+
+    <div class="post-body">
+
+      
+      
+
+      
+        
+          
+        
+      
+    </div>
+
+    <div class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </div>
+  </div>
+
+
+    
+      
+
+  <div class="post post-type-normal ">
+    <div class="post-header">
+
+      
+      
+        <h1 class="post-title">
+          
+          
+            
+              <a class="post-title-link" href="/2015/05/15/scala函数式编程思想-1-lambda简介/">
+                scala函数式编程思想._1.lambda简介
+              </a>
+            
+          
+        </h1>
+      
+
+      <div class="post-meta">
+        <span class="post-time">
+          發表於 2015-05-15
+        </span>
+
+        
+
+        
+          
+        
+      </div>
+    </div>
+
+    <div class="post-body">
+
+      
+      
+
+      
+        
+          <blockquote>
+<p>使用C语言7年之后，发现了scala新大陆。其实这些年一直对很多的语言感兴趣，最初的python,lisp,go，都在没有相关项目支撑，浅尝辄止后，一一放弃。而scala的学习却是在公司产品技术线的更新，大数据处理平台从hadoop转向spark这一需求而开始，所以也是一种际遇。  </p>
+</blockquote>
+<h1 id="起源">起源</h1><p>在可计算性理论和计算复杂性理论中，决定性问题表示一个在某些形式系统回答是或否的问题。其定义为：决定性问题指的是在一个数量为无限大的输入集合中，可产出任何是或非解答的问题之集合。20世纪30年代，阿隆佐-邱奇和他的学生斯蒂芬-科尔-克莱尼运用lambda演算给出决定性问题一个否定的答案。这种演算可以用来清晰的定义什么是一个可计算函数。</p>
+
+        
+      
+    </div>
+
+    <div class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </div>
+  </div>
+
+
+    
+      
+
+  <div class="post post-type-normal ">
+    <div class="post-header">
+
+      
+      
+        <h1 class="post-title">
+          
+          
+            
               <a class="post-title-link" href="/2015/05/06/elasticsearch模板/">
                 elasticsearch模板
               </a>
@@ -522,7 +727,7 @@
         <div class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">5</span>
+              <span class="site-state-item-count">8</span>
               <span class="site-state-item-name">文章</span>
             </a>
           </div>
