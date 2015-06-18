@@ -143,9 +143,11 @@
 </blockquote>
 </li>
 </ol>
+<blockquote>
 <p><em>hbase 写优化</em><br>由于我们的hbase使用其作为中间存储，离线计算任务需要scan时间戳来拿去5分钟内的源数据，所以我们在rowkey中增加了时间戳，类似如 “function_a_result:timestamp:UUID” 格式，在hbase的web界面，可以发现其request大多集中在集群的某一台机器上，也就是说，大多数的结果都存在了一个region server上。而hbase是通过rowkey来选择regionserver的，为了写优化，最快的效率就是使用UUID作为其rowkey。由于UUID的随机性，能够保证所有的行数据都均匀散列到集群的region server中。但此种做法就会导致离线计算无法根据时间戳拿到5分钟/1小时的源数据。参考opentsdb的rowkey设计，我们折中，rowkey设计为：”random(0-5):timestamp:UUID”。此种更改之后，写速率能够达到10M结果30-40s的写入时间。 </p>
 <p><em>elasticsearch 优化</em><br>elasticsearch由于索引及数据存储到本地磁盘，并使用分片的形式来做分布式的并行存储，所以其效率是比较高的，但是我们的elasticsearch机器是部署在spark/mr的计算结点上，当有计算任务时，会导致ES的效率不稳定。首先，我们将elastic search集群独立，迁移到5台32核96G内存12个磁盘的新服务器中，将12个磁盘全部分配给elastic search，并将ES的默认5个分配增加到30个。配置数据服务器，搜索服务器，主节点服务器都单独分配。现在测试发现，10M的计算结果(1亿条+)的写入速度在10s左右。</p>
 <p>在hbase和ES都分别做优化后，方案一虽然有性能大大幅提高，但是并不能满足7/24服务要求，所以此方案失败。</p>
+</blockquote>
 <ol>
 <li>方案二，在优化ES后，发现其性能的优越,而hbase由于过于博大精深，在追求产品开发效率的时候，我们直接<br>使用ES作为中间数据存储，计算架构更改如下：<blockquote>
 <p>实时： kafka  ———&gt;  spark streaming  —-(1min)—-&gt;  elasticsearch<br>离线： elasticsearch —-(1min)—-&gt; spark —-(5min/1hour)—-&gt; elasticsearch<br>直接读取ES内的一分钟计算结果，作为5分钟/1小时离线的数据源，由于ES的索引机制，所以读取时间远远快于hbase。方案更改后，20+个计算任务分成2个子任务，每个子任务都能保证30s左右完成计算，保证了7/24服务。 </p>
